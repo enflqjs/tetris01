@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고양이 테트리스 (Cat Tetris Purrfect Edition)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            font-family: 'Fredoka', 'Gowun Dodum', sans-serif;
+            background: radial-gradient(circle at center, #1e1b2e 0%, #0f0d18 100%);
+            color: #f3f4f6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .jua-font {
+            font-family: 'Jua', sans-serif;
+        }
+        /* Glassmorphic Panel UI */
+        .glass-panel {
+            background: rgba(30, 27, 46, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glass-panel-glow {
+            border: 1px solid rgba(236, 72, 153, 0.3);
+            box-shadow: 0 0 20px rgba(236, 72, 153, 0.15);
+        }
+        /* Custom Neon Glow Text */
+        .neon-text {
+            text-shadow: 0 0 8px rgba(244, 114, 182, 0.6), 0 0 20px rgba(236, 72, 153, 0.4);
+        }
+        .neon-border {
+            box-shadow: 0 0 15px rgba(244, 114, 182, 0.3);
+        }
+        /* Canvas Screen Shake Container */
+        #game-container {
+            transition: transform 0.05s ease-out;
+            will-change: transform;
+        }
+        /* Canvas Styling */
+        canvas {
+            image-rendering: pixelated;
+            border-radius: 12px;
+        }
+        /* Custom Button Hover Effects */
+        .cat-btn {
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .cat-btn:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 6px 20px rgba(244, 114, 182, 0.4);
+        }
+        .cat-btn:active {
+            transform: translateY(1px) scale(0.98);
+        }
+        /* Custom Scrollbar for High Scores */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(244, 114, 182, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(244, 114, 182, 0.7);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-2 sm:p-4 min-h-screen select-none">
+
+    <!-- Header Header Title -->
+    <header class="text-center mb-3">
+        <h1 class="text-3xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 jua-font tracking-wide flex items-center justify-center gap-2">
+            <i class="fa-solid font-black fa-cat text-pink-400 animate-bounce"></i>
+            <span>고양이 테트리스</span>
+            <i class="fa-solid font-black fa-paw text-pink-400"></i>
+        </h1>
+        <p class="text-xs sm:text-sm text-pink-200/70 mt-1">모든 블록이 야옹이! 팡팡 터지는 고양이 발바닥 파티!</p>
+    </header>
+
+    <!-- Main Game Container -->
+    <div class="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 max-w-5xl w-full">
+
+        <!-- Left Info Panel (Hold Piece + Controls) -->
+        <div class="flex flex-row lg:flex-col gap-3 w-full lg:w-48 order-2 lg:order-1">
+            <!-- Hold Block Box -->
+            <div class="glass-panel rounded-2xl p-3 flex-1 flex flex-col items-center text-center">
+                <span class="text-xs font-bold text-pink-300 tracking-wider uppercase mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-hand"></i> 홀드 (HOLD)
+                </span>
+                <div class="w-24 h-20 bg-slate-900/60 rounded-xl flex items-center justify-center border border-pink-500/20">
+                    <canvas id="hold-canvas" width="90" height="70"></canvas>
+                </div>
+                <span class="text-[10px] text-gray-400 mt-1">단축키: <span class="text-pink-300 font-semibold">C / Shift</span></span>
+            </div>
+
+            <!-- Stats Box -->
+            <div class="glass-panel rounded-2xl p-3 flex-1 flex flex-col gap-2">
+                <div class="flex justify-between items-center border-b border-gray-700/50 pb-1">
+                    <span class="text-xs text-gray-300">점수</span>
+                    <span id="score-val" class="text-lg font-bold text-yellow-300 jua-font">0</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-700/50 pb-1">
+                    <span class="text-xs text-gray-300">지운 줄 수</span>
+                    <span id="lines-val" class="text-lg font-bold text-pink-400 jua-font">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-300">레벨</span>
+                    <span id="level-val" class="text-lg font-bold text-cyan-300 jua-font">1</span>
+                </div>
+            </div>
+
+            <!-- Control Guide (Desktop view) -->
+            <div class="glass-panel rounded-2xl p-3 hidden lg:flex flex-col text-xs gap-1.5 text-gray-300">
+                <div class="font-bold text-pink-300 border-b border-gray-700/50 pb-1 mb-0.5 flex items-center gap-1">
+                    <i class="fa-solid fa-keyboard"></i> 조작 안내
+                </div>
+                <div class="flex justify-between"><span>← →</span><span class="text-gray-400">좌우 이동</span></div>
+                <div class="flex justify-between"><span>↑</span><span class="text-gray-400">시계 회전</span></div>
+                <div class="flex justify-between"><span>Z</span><span class="text-gray-400">반시계 회전</span></div>
+                <div class="flex justify-between"><span>↓</span><span class="text-gray-400">소프트 드롭</span></div>
+                <div class="flex justify-between"><span>Space</span><span class="text-pink-300 font-bold">하드 드롭</span></div>
+                <div class="flex justify-between"><span>P</span><span class="text-gray-400">일시정지</span></div>
+                <div class="flex justify-between"><span>R</span><span class="text-gray-400">재시작</span></div>
+            </div>
+        </div>
+
+        <!-- Center: Tetris Game Canvas Screen -->
+        <div id="game-container" class="relative glass-panel glass-panel-glow rounded-2xl p-2 sm:p-3 order-1 lg:order-2">
+            <!-- Canvas -->
+            <canvas id="tetris-canvas" width="300" height="600" class="bg-slate-950 shadow-inner border border-slate-800/80 block"></canvas>
+
+            <!-- Overlay Popups (Start / Pause / Game Over) -->
+            <div id="overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md rounded-2xl flex flex-col items-center justify-center p-6 text-center z-20">
+                <!-- Start Overlay Content -->
+                <div id="start-screen" class="flex flex-col items-center gap-4">
+                    <div class="w-20 h-20 bg-pink-500/20 rounded-full flex items-center justify-center text-4xl text-pink-400 animate-pulse border border-pink-500/40">
+                        <i class="fa-solid fa-cat"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold jua-font text-pink-300">야옹이 준비 완료!</h2>
+                    <p class="text-sm text-gray-300 max-w-xs">
+                        귀여운 고양이 블록을 쌓아 줄을 지워보세요.<br>엄청난 고양이 발바닥이 터집니다!
+                    </p>
+                    <button id="start-btn" class="cat-btn mt-2 px-8 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full font-bold text-lg text-white shadow-lg shadow-pink-500/30 flex items-center gap-2">
+                        <i class="fa-solid fa-play"></i> 게임 시작 (Enter)
+                    </button>
+                </div>
+
+                <!-- Pause Overlay Content -->
+                <div id="pause-screen" class="hidden flex flex-col items-center gap-4">
+                    <i class="fa-solid fa-pause text-5xl text-yellow-400 animate-bounce"></i>
+                    <h2 class="text-3xl font-bold jua-font text-yellow-300">일시 정지</h2>
+                    <p class="text-sm text-gray-300">잠시 휴식 중... 'P' 키를 누르면 계속합니다.</p>
+                    <button id="resume-btn" class="cat-btn px-6 py-2 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 rounded-full font-bold text-yellow-200">
+                        계속하기
+                    </button>
+                </div>
+
+                <!-- Game Over Overlay Content -->
+                <div id="gameover-screen" class="hidden flex flex-col items-center gap-3 w-full max-w-xs">
+                    <i class="fa-solid fa-skull-crossbones text-4xl text-red-400"></i>
+                    <h2 class="text-3xl font-bold jua-font text-red-400">GAME OVER</h2>
+                    <p class="text-sm text-gray-300">최종 점수: <span id="final-score" class="text-yellow-300 font-bold text-lg jua-font">0</span></p>
+
+                    <!-- Save High Score Input -->
+                    <div id="record-input-section" class="w-full flex flex-col gap-2 my-1">
+                        <label for="player-name" class="text-xs text-pink-300">집사 이름을 입력하세요 (최고기록 등록):</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="player-name" maxlength="10" placeholder="귀여운 집사" class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-pink-500/40 text-center text-sm text-white focus:outline-none focus:border-pink-400">
+                            <button id="save-score-btn" class="cat-btn px-4 py-1.5 bg-pink-500 hover:bg-pink-600 rounded-lg text-sm font-bold text-white shrink-0">
+                                저장
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="restart-btn" class="cat-btn mt-2 px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full font-bold text-white shadow-lg">
+                        <i class="fa-solid fa-rotate-right"></i> 다시 시작 (R)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Info Panel (Next Piece + Leaderboard + Audio Toggle) -->
+        <div class="flex flex-row lg:flex-col gap-3 w-full lg:w-48 order-3">
+            <!-- Next Block Slot -->
+            <div class="glass-panel rounded-2xl p-3 flex-1 flex flex-col items-center text-center">
+                <span class="text-xs font-bold text-pink-300 tracking-wider uppercase mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-forward"></i> 다음 블록 (NEXT)
+                </span>
+                <div class="w-24 h-20 bg-slate-900/60 rounded-xl flex items-center justify-center border border-pink-500/20">
+                    <canvas id="next-canvas" width="90" height="70"></canvas>
+                </div>
+            </div>
+
+            <!-- Leaderboard Box -->
+            <div class="glass-panel rounded-2xl p-3 flex-1 flex flex-col gap-1.5">
+                <div class="flex justify-between items-center border-b border-gray-700/50 pb-1">
+                    <span class="text-xs font-bold text-yellow-300 flex items-center gap-1">
+                        <i class="fa-solid fa-trophy"></i> 명예의 전당
+                    </span>
+                </div>
+                <div id="leaderboard-list" class="flex flex-col gap-1 max-h-32 overflow-y-auto text-xs pr-1">
+                    <!-- Dynamic ranking items -->
+                </div>
+            </div>
+
+            <!-- Audio Control & Settings -->
+            <div class="glass-panel rounded-2xl p-3 flex flex-col gap-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-300 flex items-center gap-1"><i class="fa-solid fa-volume-high"></i> 효과음</span>
+                    <button id="sfx-toggle" class="px-2.5 py-1 rounded-md bg-pink-500/20 border border-pink-500/40 text-pink-300 font-bold hover:bg-pink-500/30">
+                        ON
+                    </button>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-300 flex items-center gap-1"><i class="fa-solid fa-music"></i> 배경음악</span>
+                    <button id="bgm-toggle" class="px-2.5 py-1 rounded-md bg-pink-500/20 border border-pink-500/40 text-pink-300 font-bold hover:bg-pink-500/30">
+                        ON
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Mobile Touch On-Screen Controls -->
+    <div class="lg:hidden mt-3 w-full max-w-sm flex flex-col gap-2">
+        <div class="grid grid-cols-3 gap-2">
+            <button id="btn-rot-ccw" class="cat-btn py-3 bg-slate-800/80 rounded-xl text-pink-300 font-bold border border-slate-700 active:bg-pink-600/30">
+                <i class="fa-solid fa-rotate-left"></i> Z
+            </button>
+            <button id="btn-rot-cw" class="cat-btn py-3 bg-slate-800/80 rounded-xl text-pink-300 font-bold border border-slate-700 active:bg-pink-600/30">
+                <i class="fa-solid fa-rotate-right"></i> 회전 (↑)
+            </button>
+            <button id="btn-hold" class="cat-btn py-3 bg-slate-800/80 rounded-xl text-yellow-300 font-bold border border-slate-700 active:bg-yellow-600/30">
+                <i class="fa-solid fa-hand"></i> 홀드
+            </button>
+        </div>
+        <div class="grid grid-cols-4 gap-2">
+            <button id="btn-left" class="cat-btn py-3 bg-slate-800/80 rounded-xl text-white font-bold border border-slate-700 active:bg-slate-700">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button id="btn-down" class="cat-btn py-3 bg-slate-800/80 rounded-xl text-white font-bold border border-slate-700 active:bg-slate-700">
+                <i class="fa-solid fa-arrow-down"></i>
+            </button>
+            <button id="btn-right" class="cat-btn py-3 bg-slate-800/80 rounded-xl text-white font-bold border border-slate-700 active:bg-slate-700">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <button id="btn-space" class="cat-btn py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-bold shadow active:opacity-80">
+                DROP
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Engine -->
+    <script>
+        // ====================================================================
+        // 1. CONSTANTS & CAT BLOCK COAT DEFINITIONS
+        // ====================================================================
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 30; // 30x30 pixels per grid cell
+
+        // 7 Tetrominoes with unique Cat Coat patterns
+        const COATS = {
+            I: { name: "치즈 태비", base: "#f59e0b", inner: "#fde68a", ear: "#d97706", eye: "#10b981", stripes: "#b45309" },
+            O: { name: "삼색이", base: "#f3f4f6", inner: "#fef3c7", ear: "#f97316", earR: "#374151", eye: "#f59e0b", spots: ["#f97316", "#374151"] },
+            T: { name: "젖소냥", base: "#ffffff", inner: "#e5e7eb", ear: "#1f2937", eye: "#3b82f6", spots: ["#1f2937"] },
+            S: { name: "실버 태비", base: "#9ca3af", inner: "#f3f4f6", ear: "#4b5563", eye: "#eab308", stripes: "#374151" },
+            Z: { name: "샴 고양이", base: "#fef3c7", inner: "#fffbeb", ear: "#78350f", eye: "#06b6d4", mask: "#78350f" },
+            J: { name: "턱시도냥", base: "#1e293b", inner: "#475569", ear: "#0f172a", eye: "#eab308", chest: "#ffffff" },
+            L: { name: "카오스냥", base: "#ea580c", inner: "#ffedd5", ear: "#9a3412", eye: "#84cc16", stripes: "#7c2d12" }
+        };
+
+        const SHAPES = {
+            I: [[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]],
+            O: [[1,1], [1,1]],
+            T: [[0,1,0], [1,1,1], [0,0,0]],
+            S: [[0,1,1], [1,1,0], [0,0,0]],
+            Z: [[1,1,0], [0,1,1], [0,0,0]],
+            J: [[1,0,0], [1,1,1], [0,0,0]],
+            L: [[0,0,1], [1,1,1], [0,0,0]]
+        };
+
+        // Standard SRS Wall Kick Data
+        const WALL_KICKS = {
+            normal: [
+                [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]], // 0->1
+                [[0,0], [1,0], [1,-1], [0,2], [1,2]],     // 1->2
+                [[0,0], [1,0], [1,1], [0,-2], [1,-2]],     // 2->3
+                [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]]    // 3->0
+            ],
+            I: [
+                [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
+                [[0,0], [-1,0], [2,0], [-1,2], [2,-1]],
+                [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
+                [[0,0], [1,0], [-2,0], [1,-2], [-2,1]]
+            ]
+        };
+
+        // ====================================================================
+        // 2. AUDIO SYNTHESIZER (Web Audio API - Meow & BGM Generator)
+        // ====================================================================
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.sfxEnabled = true;
+                this.bgmEnabled = true;
+                this.bgmTimer = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            // Synthesize Cat Meow Sound with pitch shifting
+            playMeow(pitchMultiplier = 1.0, isCombo = false) {
+                if (!this.sfxEnabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+
+                // Pitch envelope for "Meow~" (Starts mid, glides up, settles down)
+                const baseFreq = (isCombo ? 520 : 420) * pitchMultiplier;
+                osc.frequency.setValueAtTime(baseFreq * 0.8, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.3, now + 0.12);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.7, now + 0.45);
+
+                // Filter envelope for vowel sound formant (Ee -> Ah -> Oo)
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.Q.setValueAtTime(3.0, now);
+                filter.frequency.setValueAtTime(800, now);
+                filter.frequency.exponentialRampToValueAtTime(1800, now + 0.15);
+                filter.frequency.exponentialRampToValueAtTime(500, now + 0.45);
+
+                // Volume envelope
+                gain.gain.setValueAtTime(0.01, now);
+                gain.gain.linearRampToValueAtTime(0.3, now + 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.46);
+            }
+
+            // Quick SFX Tone (Move, Rotate, Drop)
+            playTone(freq, type, duration, vol = 0.1) {
+                if (!this.sfxEnabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + duration);
+            }
+
+            // Procedural Lo-Fi Chiptune BGM Loop
+            startBGM() {
+                if (!this.bgmEnabled || this.bgmTimer) return;
+                this.init();
+
+                const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // C Major
+                let step = 0;
+
+                this.bgmTimer = setInterval(() => {
+                    if (!this.bgmEnabled) return;
+                    const now = this.ctx.currentTime;
+                    const note = notes[step % notes.length];
+
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(note * 0.5, now);
+
+                    gain.gain.setValueAtTime(0.04, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.26);
+
+                    step = (step + Math.floor(Math.random() * 3) + 1) % notes.length;
+                }, 300);
+            }
+
+            stopBGM() {
+                if (this.bgmTimer) {
+                    clearInterval(this.bgmTimer);
+                    this.bgmTimer = null;
+                }
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // ====================================================================
+        // 3. CANVAS RENDERER FOR CAT FACES & JUICE PARTICLES
+        // ====================================================================
+        // Draw unified Cat Cell Face
+        function drawCatCell(ctx, x, y, size, type, isGhost = false, alpha = 1.0) {
+            const coat = COATS[type] || COATS["I"];
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+
+            if (isGhost) {
+                // Ghost outline cat
+                ctx.strokeStyle = coat.base;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(2, 2, size - 4, size - 4);
+
+                // Ears outline
+                ctx.beginPath();
+                ctx.moveTo(4, 8); ctx.lineTo(8, 2); ctx.lineTo(14, 6);
+                ctx.moveTo(size - 4, 8); ctx.lineTo(size - 8, 2); ctx.lineTo(size - 14, 6);
+                ctx.stroke();
+                ctx.restore();
+                return;
+            }
+
+            // Main Cat Head Box
+            ctx.fillStyle = coat.base;
+            ctx.beginPath();
+            ctx.roundRect(1, 1, size - 2, size - 2, 8);
+            ctx.fill();
+
+            // Inner Face Shading
+            ctx.fillStyle = coat.inner;
+            ctx.beginPath();
+            ctx.roundRect(3, 10, size - 6, size - 12, 6);
+            ctx.fill();
+
+            // Coat Markings / Stripes / Spots
+            if (coat.stripes) {
+                ctx.fillStyle = coat.stripes;
+                ctx.fillRect(size * 0.4, 2, size * 0.2, 5);
+                ctx.fillRect(size * 0.2, 3, size * 0.1, 4);
+                ctx.fillRect(size * 0.7, 3, size * 0.1, 4);
+            } else if (coat.spots) {
+                ctx.fillStyle = coat.spots[0];
+                ctx.beginPath();
+                ctx.arc(size * 0.25, size * 0.35, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Ears
+            ctx.fillStyle = coat.ear;
+            // Left Ear
+            ctx.beginPath();
+            ctx.moveTo(2, 8); ctx.lineTo(7, 1); ctx.lineTo(13, 6); ctx.closePath();
+            ctx.fill();
+            // Right Ear
+            ctx.fillStyle = coat.earR || coat.ear;
+            ctx.beginPath();
+            ctx.moveTo(size - 2, 8); ctx.lineTo(size - 7, 1); ctx.lineTo(size - 13, 6); ctx.closePath();
+            ctx.fill();
+
+            // Inner Ear Pink
+            ctx.fillStyle = "#f472b6";
+            ctx.beginPath();
+            ctx.moveTo(4, 7); ctx.lineTo(7, 3); ctx.lineTo(10, 6); ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(size - 4, 7); ctx.lineTo(size - 7, 3); ctx.lineTo(size - 10, 6); ctx.closePath();
+            ctx.fill();
+
+            // Eyes
+            const eyeY = size * 0.48;
+            ctx.fillStyle = "#111827"; // Outer eye
+            ctx.beginPath();
+            ctx.ellipse(size * 0.3, eyeY, 3, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(size * 0.7, eyeY, 3, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Iris Color
+            ctx.fillStyle = coat.eye;
+            ctx.beginPath();
+            ctx.arc(size * 0.3, eyeY, 2, 0, Math.PI * 2);
+            ctx.arc(size * 0.7, eyeY, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye Shine
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(size * 0.26, eyeY - 1, 0.8, 0, Math.PI * 2);
+            ctx.arc(size * 0.66, eyeY - 1, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pink Cheeks
+            ctx.fillStyle = "rgba(244, 114, 182, 0.5)";
+            ctx.beginPath();
+            ctx.arc(size * 0.2, size * 0.62, 2.5, 0, Math.PI * 2);
+            ctx.arc(size * 0.8, size * 0.62, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose & Mouth
+            ctx.fillStyle = "#f43f5e";
+            ctx.beginPath();
+            ctx.moveTo(size * 0.5 - 1.5, size * 0.62);
+            ctx.lineTo(size * 0.5 + 1.5, size * 0.62);
+            ctx.lineTo(size * 0.5, size * 0.68);
+            ctx.closePath();
+            ctx.fill();
+
+            // Whiskers
+            ctx.strokeStyle = "rgba(100, 116, 139, 0.6)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            // Left whiskers
+            ctx.moveTo(size * 0.2, size * 0.68); ctx.lineTo(2, size * 0.65);
+            ctx.moveTo(size * 0.2, size * 0.72); ctx.lineTo(2, size * 0.75);
+            // Right whiskers
+            ctx.moveTo(size * 0.8, size * 0.68); ctx.lineTo(size - 2, size * 0.65);
+            ctx.moveTo(size * 0.8, size * 0.72); ctx.lineTo(size - 2, size * 0.75);
+            ctx.stroke();
+
+            // Gloss Highlight
+            ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.fillRect(3, 3, size - 6, 2);
+
+            ctx.restore();
+        }
+
+        // Particle Class for Cat Paw Explosions & Hard Drop FX
+        class PawParticle {
+            constructor(x, y, isPaw = true, scoreText = null) {
+                this.x = x;
+                this.y = y;
+                this.isPaw = isPaw;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = -Math.random() * 6 - 3;
+                this.size = isPaw ? Math.random() * 12 + 18 : Math.random() * 6 + 3;
+                this.alpha = 1.0;
+                this.decay = Math.random() * 0.02 + 0.015;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.2;
+                this.scoreText = scoreText;
+                this.color = ["#f472b6", "#fb7185", "#38bdf8", "#fde047"][Math.floor(Math.random() * 4)];
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.2; // Gravity
+                this.rotation += this.rotSpeed;
+                this.alpha -= this.decay;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                if (this.isPaw) {
+                    // Draw Floating Pink Cat Paw Print
+                    ctx.fillStyle = "#f472b6";
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.5;
+
+                    // Main Pad
+                    ctx.beginPath();
+                    ctx.ellipse(0, 2, this.size * 0.4, this.size * 0.3, 0, 0, Math.PI * 2);
+                    ctx.fill(); ctx.stroke();
+
+                    // 4 Toe Pads
+                    const toes = [[-0.35, -0.3], [-0.12, -0.45], [0.12, -0.45], [0.35, -0.3]];
+                    toes.forEach(([tx, ty]) => {
+                        ctx.beginPath();
+                        ctx.arc(tx * this.size, ty * this.size, this.size * 0.12, 0, Math.PI * 2);
+                        ctx.fill(); ctx.stroke();
+                    });
+
+                    if (this.scoreText) {
+                        ctx.rotate(-this.rotation);
+                        ctx.font = "bold 16px 'Jua', sans-serif";
+                        ctx.fillStyle = "#fef08a";
+                        ctx.shadowColor = "#eab308";
+                        ctx.shadowBlur = 8;
+                        ctx.fillText(this.scoreText, 0, -this.size * 0.6);
+                    }
+                } else {
+                    // Sparkle Fur Fragment
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // ====================================================================
+        // 4. TETRIS CORE GAME LOGIC
+        // ====================================================================
+        class TetrisGame {
+            constructor() {
+                this.canvas = document.getElementById("tetris-canvas");
+                this.ctx = this.canvas.getContext("2d");
+                this.nextCanvas = document.getElementById("next-canvas");
+                this.nextCtx = this.nextCanvas.getContext("2d");
+                this.holdCanvas = document.getElementById("hold-canvas");
+                this.holdCtx = this.holdCanvas.getContext("2d");
+
+                this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+                this.score = 0;
+                this.lines = 0;
+                this.level = 1;
+
+                this.piece = null;
+                this.nextPiece = null;
+                this.holdPiece = null;
+                this.canHold = true;
+
+                this.gameOver = false;
+                this.paused = false;
+                this.started = false;
+
+                this.dropCounter = 0;
+                this.dropInterval = 1000;
+                this.lastTime = 0;
+
+                this.particles = [];
+                this.screenShakeTime = 0;
+                this.screenShakeIntensity = 0;
+                this.combo = 0;
+
+                this.comboBannerText = "";
+                this.comboBannerAlpha = 0;
+
+                this.highScores = JSON.parse(localStorage.getItem("cat_tetris_scores") || "[]");
+                this.updateLeaderboardUI();
+            }
+
+            init() {
+                this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+                this.score = 0;
+                this.lines = 0;
+                this.level = 1;
+                this.combo = 0;
+                this.gameOver = false;
+                this.paused = false;
+                this.started = true;
+                this.holdPiece = null;
+                this.canHold = true;
+                this.dropInterval = 1000;
+
+                this.nextPiece = this.randomPiece();
+                this.spawnPiece();
+                this.updateStatsUI();
+
+                document.getElementById("overlay").classList.add("hidden");
+                document.getElementById("start-screen").classList.add("hidden");
+                document.getElementById("pause-screen").classList.add("hidden");
+                document.getElementById("gameover-screen").classList.add("hidden");
+
+                audio.startBGM();
+            }
+
+            randomPiece() {
+                const types = Object.keys(SHAPES);
+                const type = types[Math.floor(Math.random() * types.length)];
+                return {
+                    type: type,
+                    shape: SHAPES[type].map(row => [...row]),
+                    x: Math.floor(COLS / 2) - Math.ceil(SHAPES[type][0].length / 2),
+                    y: 0
+                };
+            }
+
+            spawnPiece() {
+                this.piece = this.nextPiece;
+                this.nextPiece = this.randomPiece();
+                this.canHold = true;
+
+                if (this.collide(this.board, this.piece)) {
+                    // Game Over Trigger
+                    this.gameOver = true;
+                    this.started = false;
+                    audio.stopBGM();
+                    audio.playTone(150, 'sawtooth', 0.8, 0.3);
+
+                    document.getElementById("final-score").innerText = this.score;
+                    document.getElementById("overlay").classList.remove("hidden");
+                    document.getElementById("gameover-screen").classList.remove("hidden");
+                }
+
+                this.drawPreview(this.nextCtx, this.nextPiece);
+                this.drawPreview(this.holdCtx, this.holdPiece);
+            }
+
+            collide(board, piece, offsetX = 0, offsetY = 0) {
+                const shape = piece.shape;
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c]) {
+                            const newX = piece.x + c + offsetX;
+                            const newY = piece.y + r + offsetY;
+
+                            if (newX < 0 || newX >= COLS || newY >= ROWS) return true;
+                            if (newY >= 0 && board[newY][newX]) return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            rotate(dir) {
+                if (!this.started || this.paused || this.gameOver) return;
+
+                const prevShape = this.piece.shape;
+                // Matrix Transpose + Reverse = Rotation
+                const rotated = prevShape[0].map((_, i) => prevShape.map(row => row[i]));
+                if (dir > 0) rotated.forEach(row => row.reverse());
+                else rotated.reverse();
+
+                const originalShape = this.piece.shape;
+                this.piece.shape = rotated;
+
+                // Wall Kick Check
+                const kicks = this.piece.type === 'I' ? WALL_KICKS.I[0] : WALL_KICKS.normal[0];
+                let kicked = false;
+
+                for (let [kx, ky] of kicks) {
+                    if (!this.collide(this.board, this.piece, kx, ky)) {
+                        this.piece.x += kx;
+                        this.piece.y += ky;
+                        kicked = true;
+                        break;
+                    }
+                }
+
+                if (!kicked) {
+                    this.piece.shape = originalShape; // Revert
+                } else {
+                    audio.playTone(350, 'sine', 0.08, 0.15);
+                }
+            }
+
+            move(dir) {
+                if (!this.started || this.paused || this.gameOver) return;
+                if (!this.collide(this.board, this.piece, dir, 0)) {
+                    this.piece.x += dir;
+                    audio.playTone(220, 'sine', 0.05, 0.08);
+                }
+            }
+
+            drop() {
+                if (!this.started || this.paused || this.gameOver) return;
+
+                if (!this.collide(this.board, this.piece, 0, 1)) {
+                    this.piece.y++;
+                    this.score += 1; // Soft drop score
+                    this.updateStatsUI();
+                } else {
+                    this.lockPiece();
+                }
+                this.dropCounter = 0;
+            }
+
+            hardDrop() {
+                if (!this.started || this.paused || this.gameOver) return;
+
+                let dropDist = 0;
+                while (!this.collide(this.board, this.piece, 0, 1)) {
+                    this.piece.y++;
+                    dropDist++;
+                }
+
+                this.score += dropDist * 2;
+                this.triggerShake(4, 100);
+                audio.playTone(180, 'square', 0.12, 0.25);
+
+                // Hard Drop Ground Impact Dust
+                for (let c = 0; c < this.piece.shape.length; c++) {
+                    for (let r = 0; r < this.piece.shape[c].length; r++) {
+                        if (this.piece.shape[r][c]) {
+                            const px = (this.piece.x + c) * BLOCK_SIZE + BLOCK_SIZE / 2;
+                            const py = (this.piece.y + r + 1) * BLOCK_SIZE;
+                            for (let i = 0; i < 3; i++) {
+                                this.particles.push(new PawParticle(px, py, false));
+                            }
+                        }
+                    }
+                }
+
+                this.lockPiece();
+            }
+
+            hold() {
+                if (!this.started || this.paused || this.gameOver || !this.canHold) return;
+
+                if (!this.holdPiece) {
+                    this.holdPiece = { type: this.piece.type, shape: SHAPES[this.piece.type].map(r => [...r]) };
+                    this.spawnPiece();
+                } else {
+                    const temp = { type: this.piece.type, shape: SHAPES[this.piece.type].map(r => [...r]) };
+                    this.piece = {
+                        type: this.holdPiece.type,
+                        shape: SHAPES[this.holdPiece.type].map(r => [...r]),
+                        x: Math.floor(COLS / 2) - 1,
+                        y: 0
+                    };
+                    this.holdPiece = temp;
+                }
+                this.canHold = false;
+                audio.playTone(480, 'sine', 0.1, 0.2);
+                this.drawPreview(this.holdCtx, this.holdPiece);
+            }
+
+            lockPiece() {
+                const shape = this.piece.shape;
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c]) {
+                            this.board[this.piece.y + r][this.piece.x + c] = this.piece.type;
+                        }
+                    }
+                }
+                this.clearLines();
+                this.spawnPiece();
+            }
+
+            // Massive Paw Pop Clear Lines Effect
+            clearLines() {
+                let linesCleared = 0;
+                let clearedRows = [];
+
+                for (let r = ROWS - 1; r >= 0; r--) {
+                    if (this.board[r].every(cell => cell !== 0)) {
+                        clearedRows.push(r);
+                        linesCleared++;
+                    }
+                }
+
+                if (linesCleared > 0) {
+                    // Remove Rows
+                    clearedRows.forEach(r => {
+                        this.board.splice(r, 1);
+                        this.board.unshift(Array(COLS).fill(0));
+                    });
+
+                    // Scoring & Leveling
+                    const baseScores = [0, 100, 300, 500, 800];
+                    this.combo = (linesCleared > 1) ? this.combo + 1 : 0;
+                    const comboBonus = this.combo * 50;
+
+                    this.score += (baseScores[linesCleared] * this.level) + comboBonus;
+                    this.lines += linesCleared;
+                    this.level = Math.floor(this.lines / 10) + 1;
+                    this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 85);
+
+                    // Audio Meow FX
+                    audio.playMeow(1.0 + linesCleared * 0.15, this.combo > 0);
+
+                    // Dynamic Screen Shake
+                    this.triggerShake(linesCleared * 6 + (this.combo * 3), 200 + linesCleared * 50);
+
+                    // SPAWN MASSIVE CAT PAWS FX (10 to 40 Paws Bursting!)
+                    const pawCount = linesCleared * 8 + (this.combo * 4);
+                    clearedRows.forEach((r, idx) => {
+                        for (let i = 0; i < pawCount; i++) {
+                            const spawnX = Math.random() * (COLS * BLOCK_SIZE);
+                            const spawnY = r * BLOCK_SIZE + Math.random() * BLOCK_SIZE;
+                            const scoreStr = (idx === 0 && i === 0) ? `+${baseScores[linesCleared]}` : null;
+                            this.particles.push(new PawParticle(spawnX, spawnY, true, scoreStr));
+                            this.particles.push(new PawParticle(spawnX, spawnY, false));
+                        }
+                    });
+
+                    // Set Praise Banner
+                    const BANNERS = ["MEOW!", "CAT-TASTIC!", "PURRFECT!!", "MEOW-GICAL!!!"];
+                    this.comboBannerText = BANNERS[Math.min(linesCleared - 1, 3)];
+                    if (this.combo > 1) this.comboBannerText += ` ${this.combo}COMBO!`;
+                    this.comboBannerAlpha = 1.0;
+
+                    this.updateStatsUI();
+                } else {
+                    this.combo = 0;
+                }
+            }
+
+            getGhostPosition() {
+                let ghostY = this.piece.y;
+                while (!this.collide(this.board, this.piece, 0, ghostY - this.piece.y + 1)) {
+                    ghostY++;
+                }
+                return ghostY;
+            }
+
+            triggerShake(intensity, duration) {
+                this.screenShakeIntensity = intensity;
+                this.screenShakeTime = duration;
+            }
+
+            updateStatsUI() {
+                document.getElementById("score-val").innerText = this.score;
+                document.getElementById("lines-val").innerText = this.lines;
+                document.getElementById("level-val").innerText = this.level;
+            }
+
+            updateLeaderboardUI() {
+                const listEl = document.getElementById("leaderboard-list");
+                listEl.innerHTML = "";
+
+                this.highScores.sort((a, b) => b.score - a.score);
+                const top5 = this.highScores.slice(0, 5);
+
+                if (top5.length === 0) {
+                    listEl.innerHTML = `<div class="text-gray-500 text-center py-2">기록 없음</div>`;
+                    return;
+                }
+
+                top5.forEach((item, index) => {
+                    const row = document.createElement("div");
+                    row.className = "flex justify-between items-center bg-slate-900/40 px-2 py-1 rounded text-[11px]";
+                    row.innerHTML = `
+                        <span class="font-bold ${index === 0 ? 'text-yellow-400' : 'text-gray-300'}">${index + 1}. ${item.name}</span>
+                        <span class="text-pink-300 font-semibold">${item.score}점</span>
+                    `;
+                    listEl.appendChild(row);
+                });
+            }
+
+            saveHighScore(name) {
+                if (!name) name = "무명 집사";
+                this.highScores.push({ name, score: this.score });
+                localStorage.setItem("cat_tetris_scores", JSON.stringify(this.highScores));
+                this.updateLeaderboardUI();
+                document.getElementById("record-input-section").classList.add("hidden");
+            }
+
+            drawPreview(ctx, piece) {
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                if (!piece) return;
+
+                const shape = piece.shape;
+                const size = 18; // Smaller preview cell size
+                const offsetX = (ctx.canvas.width - shape[0].length * size) / 2;
+                const offsetY = (ctx.canvas.height - shape.length * size) / 2;
+
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c]) {
+                            drawCatCell(ctx, offsetX + c * size, offsetY + r * size, size, piece.type);
+                        }
+                    }
+                }
+            }
+
+            draw() {
+                // Clear Game Canvas
+                this.ctx.fillStyle = "#020617";
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Draw Grid Background Lines
+                this.ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+                this.ctx.lineWidth = 1;
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        this.ctx.strokeRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    }
+                }
+
+                // Draw Locked Board Cat Cells
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (this.board[r][c]) {
+                            drawCatCell(this.ctx, c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, this.board[r][c]);
+                        }
+                    }
+                }
+
+                // Draw Active Piece & Ghost Piece
+                if (this.piece && this.started && !this.gameOver) {
+                    const ghostY = this.getGhostPosition();
+
+                    // Draw Ghost Cat Block
+                    for (let r = 0; r < this.piece.shape.length; r++) {
+                        for (let c = 0; c < this.piece.shape[r].length; c++) {
+                            if (this.piece.shape[r][c]) {
+                                drawCatCell(this.ctx, (this.piece.x + c) * BLOCK_SIZE, (ghostY + r) * BLOCK_SIZE, BLOCK_SIZE, this.piece.type, true, 0.4);
+                            }
+                        }
+                    }
+
+                    // Draw Falling Cat Piece
+                    for (let r = 0; r < this.piece.shape.length; r++) {
+                        for (let c = 0; c < this.piece.shape[r].length; c++) {
+                            if (this.piece.shape[r][c]) {
+                                drawCatCell(this.ctx, (this.piece.x + c) * BLOCK_SIZE, (this.piece.y + r) * BLOCK_SIZE, BLOCK_SIZE, this.piece.type);
+                            }
+                        }
+                    }
+                }
+
+                // Draw Particles FX
+                this.particles.forEach((p, idx) => {
+                    p.update();
+                    p.draw(this.ctx);
+                    if (p.alpha <= 0) this.particles.splice(idx, 1);
+                });
+
+                // Draw Combo Praise Banner
+                if (this.comboBannerAlpha > 0) {
+                    this.ctx.save();
+                    this.ctx.globalAlpha = this.comboBannerAlpha;
+                    this.ctx.font = "bold 26px 'Jua', sans-serif";
+                    this.ctx.fillStyle = "#fef08a";
+                    this.ctx.shadowColor = "#f43f5e";
+                    this.ctx.shadowBlur = 12;
+                    this.ctx.textAlign = "center";
+                    this.ctx.fillText(this.comboBannerText, this.canvas.width / 2, 120);
+                    this.ctx.restore();
+                    this.comboBannerAlpha -= 0.02;
+                }
+
+                // Apply Screen Shake Offsets
+                const container = document.getElementById("game-container");
+                if (this.screenShakeTime > 0) {
+                    const rx = (Math.random() - 0.5) * this.screenShakeIntensity;
+                    const ry = (Math.random() - 0.5) * this.screenShakeIntensity;
+                    container.style.transform = `translate(${rx}px, ${ry}px)`;
+                    this.screenShakeTime -= 16;
+                } else {
+                    container.style.transform = `translate(0px, 0px)`;
+                }
+            }
+
+            update(time = 0) {
+                const deltaTime = time - this.lastTime;
+                this.lastTime = time;
+
+                if (this.started && !this.paused && !this.gameOver) {
+                    this.dropCounter += deltaTime;
+                    if (this.dropCounter > this.dropInterval) {
+                        this.drop();
+                    }
+                }
+
+                this.draw();
+                requestAnimationFrame(this.update.bind(this));
+            }
+        }
+
+        // Initialize Game Instance
+        const game = new TetrisGame();
+        requestAnimationFrame(game.update.bind(game));
+
+        // ====================================================================
+        // 5. EVENT LISTENERS & CONTROLS
+        // ====================================================================
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                if (!game.started) {
+                    document.getElementById("record-input-section").classList.remove("hidden");
+                    game.init();
+                }
+            } else if (e.key === "p" || e.key === "P") {
+                if (game.started && !game.gameOver) {
+                    game.paused = !game.paused;
+                    document.getElementById("overlay").classList.toggle("hidden", !game.paused);
+                    document.getElementById("pause-screen").classList.toggle("hidden", !game.paused);
+                }
+            } else if (e.key === "r" || e.key === "R") {
+                if (!document.activeElement.isEqualNode(document.getElementById("player-name"))) {
+                    document.getElementById("record-input-section").classList.remove("hidden");
+                    game.init();
+                }
+            } else if (e.key === "ArrowLeft") {
+                game.move(-1);
+            } else if (e.key === "ArrowRight") {
+                game.move(1);
+            } else if (e.key === "ArrowUp") {
+                game.rotate(1);
+            } else if (e.key === "z" || e.key === "Z") {
+                game.rotate(-1);
+            } else if (e.key === "ArrowDown") {
+                game.drop();
+            } else if (e.code === "Space") {
+                e.preventDefault();
+                game.hardDrop();
+            } else if (e.key === "c" || e.key === "C" || e.key === "Shift") {
+                game.hold();
+            }
+        });
+
+        // UI Buttons Events
+        document.getElementById("start-btn").addEventListener("click", () => {
+            document.getElementById("record-input-section").classList.remove("hidden");
+            game.init();
+        });
+        document.getElementById("resume-btn").addEventListener("click", () => {
+            game.paused = false;
+            document.getElementById("overlay").classList.add("hidden");
+            document.getElementById("pause-screen").classList.add("hidden");
+        });
+        document.getElementById("restart-btn").addEventListener("click", () => {
+            document.getElementById("record-input-section").classList.remove("hidden");
+            game.init();
+        });
+        document.getElementById("save-score-btn").addEventListener("click", () => {
+            const nameInput = document.getElementById("player-name");
+            game.saveHighScore(nameInput.value.trim());
+        });
+
+        // Audio Controls
+        document.getElementById("sfx-toggle").addEventListener("click", (e) => {
+            audio.sfxEnabled = !audio.sfxEnabled;
+            e.target.innerText = audio.sfxEnabled ? "ON" : "OFF";
+            e.target.classList.toggle("text-pink-300", audio.sfxEnabled);
+            e.target.classList.toggle("text-gray-500", !audio.sfxEnabled);
+        });
+        document.getElementById("bgm-toggle").addEventListener("click", (e) => {
+            audio.bgmEnabled = !audio.bgmEnabled;
+            e.target.innerText = audio.bgmEnabled ? "ON" : "OFF";
+            e.target.classList.toggle("text-pink-300", audio.bgmEnabled);
+            e.target.classList.toggle("text-gray-500", !audio.bgmEnabled);
+            if (audio.bgmEnabled) audio.startBGM(); else audio.stopBGM();
+        });
+
+        // Mobile On-Screen Controls
+        document.getElementById("btn-left").addEventListener("click", () => game.move(-1));
+        document.getElementById("btn-right").addEventListener("click", () => game.move(1));
+        document.getElementById("btn-down").addEventListener("click", () => game.drop());
+        document.getElementById("btn-rot-cw").addEventListener("click", () => game.rotate(1));
+        document.getElementById("btn-rot-ccw").addEventListener("click", () => game.rotate(-1));
+        document.getElementById("btn-space").addEventListener("click", () => game.hardDrop());
+        document.getElementById("btn-hold").addEventListener("click", () => game.hold());
+    </script>
+</body>
+</html>
